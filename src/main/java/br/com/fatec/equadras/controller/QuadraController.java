@@ -2,6 +2,7 @@ package br.com.fatec.equadras.controller;
 
 import br.com.fatec.equadras.config.ExemplosApi;
 import br.com.fatec.equadras.exception.ErroResposta;
+import br.com.fatec.equadras.model.EsporteDisponivel;
 import br.com.fatec.equadras.model.Quadra;
 import br.com.fatec.equadras.model.TipoEsporte;
 import br.com.fatec.equadras.service.QuadraService;
@@ -30,7 +31,7 @@ public class QuadraController {
     private QuadraService quadraService;
 
     @Operation(summary = "Cadastrar quadra",
-            description = "Nome único. Abertura e fechamento em horas cheias, com fechamento depois da abertura. Se `ativa` não for enviado, a quadra nasce ativa.")
+            description = "Nome único. Abertura e fechamento em horas cheias, com fechamento depois da abertura. Se `ativa` não for enviado, a quadra nasce ativa. Valores de `tipoEsporte`: `GET /quadra/esportes`.")
     @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(examples = @ExampleObject(value = ExemplosApi.QUADRA_REQUISICAO)))
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Quadra cadastrada",
@@ -60,6 +61,16 @@ public class QuadraController {
     @GetMapping("/ativas")
     public List<Quadra> listarQuadrasAtivas(){
         return quadraService.listarQuadrasAtivas();
+    }
+
+    @Operation(summary = "Listar tipos de esporte disponíveis",
+            description = "Valores aceitos no campo `tipoEsporte` (cadastro/atualização de quadra e pesquisa por esporte), com um nome para exibir em telas.")
+    @ApiResponse(responseCode = "200", description = "Lista de esportes",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = EsporteDisponivel.class)),
+                    examples = @ExampleObject(value = ExemplosApi.ESPORTES_RESPOSTA)))
+    @GetMapping("/esportes")
+    public List<EsporteDisponivel> listarEsportes(){
+        return quadraService.listarEsportes();
     }
 
     // PathVariable: converta o valor inserido na URL e armazene na variável ID
@@ -94,7 +105,7 @@ public class QuadraController {
     }
 
     @Operation(summary = "Pesquisar quadras por esporte",
-            description = "Valores: FUTEBOL_SOCIETY, FUTSAL, VOLEI, BEACH_TENNIS, TENIS, BASQUETE, PADEL.")
+            description = "Valores aceitos: consulte `GET /quadra/esportes` (FUTEBOL_SOCIETY, FUTSAL, VOLEI, BEACH_TENNIS, TENIS, BASQUETE, PADEL).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Quadras do esporte (pode ser vazia)",
                     content = @Content(array = @ArraySchema(schema = @Schema(implementation = Quadra.class)))),

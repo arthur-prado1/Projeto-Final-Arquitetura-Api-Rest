@@ -320,6 +320,33 @@ class EquadrasApiTest {
     }
 
     @Test
+    @DisplayName("Lista os tipos de esporte disponíveis com código e nome")
+    void listaEsportes() throws Exception {
+        mockMvc.perform(get("/quadra/esportes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(TipoEsporte.values().length))
+                .andExpect(jsonPath("$[0].codigo").value("FUTEBOL_SOCIETY"))
+                .andExpect(jsonPath("$[0].nome").value("Futebol Society"))
+                .andExpect(jsonPath("$[3].codigo").value("BEACH_TENNIS"));
+    }
+
+    @Test
+    @DisplayName("Esporte inválido no JSON ou na URL devolve 400 listando os valores aceitos")
+    void esporteInvalidoListaValoresAceitos() throws Exception {
+        String quadraXadrez = """
+                {"nome":"Quadra Xadrez","tipoEsporte":"XADREZ","valorHora":50.00,"endereco":"Rua A, 1",
+                 "horaAbertura":"08:00","horaFechamento":"22:00"}""";
+        mockMvc.perform(post("/quadra").contentType(MediaType.APPLICATION_JSON).content(quadraXadrez))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem", containsString("Valores aceitos: FUTEBOL_SOCIETY, FUTSAL")))
+                .andExpect(jsonPath("$.mensagem", containsString("GET /quadra/esportes")));
+
+        mockMvc.perform(get("/quadra/esporte/XADREZ"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem", containsString("Valores aceitos: FUTEBOL_SOCIETY")));
+    }
+
+    @Test
     @DisplayName("Valida os campos do cliente e devolve a lista de erros")
     void validaCamposDoCliente() throws Exception {
         String invalido = """

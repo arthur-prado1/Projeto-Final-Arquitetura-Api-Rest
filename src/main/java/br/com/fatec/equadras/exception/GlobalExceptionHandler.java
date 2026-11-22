@@ -1,5 +1,6 @@
 package br.com.fatec.equadras.exception;
 
+import br.com.fatec.equadras.model.TipoEsporte;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -12,7 +13,9 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 // @RestControllerAdvice: "escuta" as exceções lançadas por qualquer controller e devolve um JSON de erro padronizado
 @RestControllerAdvice
@@ -42,6 +45,13 @@ public class GlobalExceptionHandler {
     // 400 - JSON mal formado, data/hora em formato errado ou valor de enum inexistente
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErroResposta> tratarJsonInvalido(HttpMessageNotReadableException ex, HttpServletRequest request) {
+        // Esporte inexistente no JSON: a resposta já diz quais valores são aceitos
+        String causa = String.valueOf(ex.getMostSpecificCause().getMessage());
+        if (causa.contains(TipoEsporte.class.getSimpleName())) {
+            return montar(HttpStatus.BAD_REQUEST,
+                    "Valor inválido para 'tipoEsporte'. Valores aceitos: " + valoresAceitos(TipoEsporte.class)
+                            + ". Consulte GET /quadra/esportes.", request, null);
+        }
         return montar(HttpStatus.BAD_REQUEST,
                 "JSON inválido. Confira o formato: datas yyyy-MM-dd, horas HH:mm e valores permitidos dos campos (ex.: tipoEsporte).",
                 request, null);
@@ -50,8 +60,18 @@ public class GlobalExceptionHandler {
     // 400 - valor errado na URL (ex.: /reserva/data/amanha ou /quadra/esporte/XADREZ)
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErroResposta> tratarParametroInvalido(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
-        return montar(HttpStatus.BAD_REQUEST,
-                "Valor inválido para '" + ex.getName() + "': " + ex.getValue() + ".", request, null);
+        String mensagem = "Valor inválido para '" + ex.getName() + "': " + ex.getValue() + ".";
+        // Parâmetro do tipo enum (esporte, status): lista os valores aceitos
+        if (ex.getRequiredType() != null && ex.getRequiredType().isEnum()) {
+            mensagem += " Valores aceitos: " + valoresAceitos(ex.getRequiredType()) + ".";
+        }
+        return montar(HttpStatus.BAD_REQUEST, mensagem, request, null);
+    }
+
+    private String valoresAceitos(Class<?> tipoEnum) {
+        return Arrays.stream(tipoEnum.getEnumConstants())
+                .map(Object::toString)
+                .collect(Collectors.joining(", "));
     }
 
     // 409 - segurança extra: o banco recusou por chave única/estrangeira

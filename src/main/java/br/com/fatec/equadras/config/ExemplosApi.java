@@ -48,6 +48,17 @@ public final class ExemplosApi {
               "ativa": true
             }""";
 
+    public static final String ESPORTES_RESPOSTA = """
+            [
+              { "codigo": "FUTEBOL_SOCIETY", "nome": "Futebol Society" },
+              { "codigo": "FUTSAL", "nome": "Futsal" },
+              { "codigo": "VOLEI", "nome": "Vôlei" },
+              { "codigo": "BEACH_TENNIS", "nome": "Beach Tennis" },
+              { "codigo": "TENIS", "nome": "Tênis" },
+              { "codigo": "BASQUETE", "nome": "Basquete" },
+              { "codigo": "PADEL", "nome": "Padel" }
+            ]""";
+
     // ---------- RESERVA ----------
     public static final String RESERVA_REQUISICAO = """
             {

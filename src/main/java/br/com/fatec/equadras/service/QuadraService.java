@@ -2,6 +2,7 @@ package br.com.fatec.equadras.service;
 
 import br.com.fatec.equadras.exception.RecursoNaoEncontradoException;
 import br.com.fatec.equadras.exception.RegraNegocioException;
+import br.com.fatec.equadras.model.EsporteDisponivel;
 import br.com.fatec.equadras.model.Quadra;
 import br.com.fatec.equadras.model.TipoEsporte;
 import br.com.fatec.equadras.repository.QuadraRepository;
@@ -11,6 +12,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -59,6 +61,13 @@ public class QuadraService {
 
     public List<Quadra> listarQuadrasAtivas () {
         return quadraRepository.findByAtivaTrueOrderByNomeAsc();
+    }
+
+    // Lista os esportes aceitos, lida direto do enum: um esporte novo no enum aparece aqui automaticamente
+    public List<EsporteDisponivel> listarEsportes () {
+        return Arrays.stream(TipoEsporte.values())
+                .map(esporte -> new EsporteDisponivel(esporte.name(), esporte.getNome()))
+                .toList();
     }
 
     public Quadra atualizarQuadra (Long id, Quadra quadraAtualizada) {

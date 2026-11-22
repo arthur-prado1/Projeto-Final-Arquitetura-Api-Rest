@@ -36,6 +36,7 @@ Um **serviço central** que guarda clientes, quadras e reservas num banco de dad
 
 - CRUD completo de **Clientes**, **Quadras** e **Reservas**.
 - Pesquisas por ID, CPF, nome, parte do nome, esporte, quadras ativas, data, status, cliente e quadra.
+- **Lista dos tipos de esporte aceitos**, para qualquer aplicação montar seus filtros e formulários.
 - **Grade de horários livres** de uma quadra num dia.
 - **Cancelamento** e **remarcação** de reservas com política de antecedência.
 - **Faturamento** por quadra, calculado a partir das reservas confirmadas.
@@ -75,7 +76,7 @@ Um **serviço central** que guarda clientes, quadras e reservas num banco de dad
 | Bean Validation / Hibernate Validator | Validação dos dados (inclui `@CPF`) |
 | springdoc-openapi (Swagger UI) | Documentação |
 | Lombok | Getters/setters automáticos |
-| JUnit 5 + MockMvc + H2 | 28 testes automatizados das regras e endpoints |
+| JUnit 5 + MockMvc + H2 | 30 testes automatizados das regras e endpoints |
 | Maven (Maven Wrapper) | Build |
 
 ## 6. Arquitetura e organização
@@ -89,7 +90,7 @@ src/main/java/br/com/fatec/equadras/
 ├── service/      ClienteService, QuadraService, ReservaService            → regras de negócio
 ├── repository/   ClienteRepository, QuadraRepository, ReservaRepository   → acesso ao banco (JpaRepository + Query Methods)
 ├── model/        Cliente, Quadra, Reserva (entidades) + TipoEsporte, StatusReserva (enums)
-│                 HorarioDisponivel, ResumoFaturamento (respostas de consulta)
+│                 HorarioDisponivel, ResumoFaturamento, EsporteDisponivel (respostas de consulta)
 ├── exception/    GlobalExceptionHandler, ErroResposta, RegraNegocioException, RecursoNaoEncontradoException
 └── config/       OpenApiConfig (Swagger), ExemplosApi, RelogioConfig, CargaInicialDados
 ```
@@ -165,7 +166,7 @@ mvnw.cmd test        # Windows
 ```
 Os testes usam o banco em memória H2, com o "relógio" fixo em 10/01/2030 às 10:00. Não é preciso ter o PostgreSQL ligado para rodá-los.
 
-## 8. Endpoints (28)
+## 8. Endpoints (29)
 
 ### Clientes — `/cliente`
 | Método | Rota | Descrição | Sucesso |
@@ -184,6 +185,7 @@ Os testes usam o banco em memória H2, com o "relógio" fixo em 10/01/2030 às 1
 | POST | `/quadra` | Cadastrar quadra | 201 |
 | GET | `/quadra` | Listar todas | 200 |
 | GET | `/quadra/ativas` | Listar só as ativas | 200 |
+| GET | `/quadra/esportes` | Listar os tipos de esporte aceitos (código e nome) | 200 |
 | GET | `/quadra/id/{id}` | Pesquisar pelo ID | 200 |
 | GET | `/quadra/nome/{nome}` | Pesquisar pelo nome exato | 200 |
 | GET | `/quadra/partenome/{nome}` | Pesquisar por parte do nome | 200 |
@@ -207,7 +209,21 @@ Os testes usam o banco em memória H2, com o "relógio" fixo em 10/01/2030 às 1
 | PUT | `/reserva/cancelar/{id}` | Cancelar | 200 |
 | DELETE | `/reserva/{id}` | Excluir (só se cancelada) | 204 |
 
-Valores aceitos em `tipoEsporte`: `FUTEBOL_SOCIETY`, `FUTSAL`, `VOLEI`, `BEACH_TENNIS`, `TENIS`, `BASQUETE`, `PADEL`.
+Valores aceitos em `tipoEsporte`: `FUTEBOL_SOCIETY`, `FUTSAL`, `VOLEI`, `BEACH_TENNIS`, `TENIS`, `BASQUETE`, `PADEL`. Qualquer aplicação pode consultá-los em `GET /quadra/esportes`:
+
+```json
+[
+  { "codigo": "FUTEBOL_SOCIETY", "nome": "Futebol Society" },
+  { "codigo": "FUTSAL", "nome": "Futsal" },
+  { "codigo": "VOLEI", "nome": "Vôlei" },
+  { "codigo": "BEACH_TENNIS", "nome": "Beach Tennis" },
+  { "codigo": "TENIS", "nome": "Tênis" },
+  { "codigo": "BASQUETE", "nome": "Basquete" },
+  { "codigo": "PADEL", "nome": "Padel" }
+]
+```
+
+Um esporte inexistente no cadastro ou na pesquisa devolve `400` com a lista dos valores aceitos.
 
 ## 9. Exemplos
 
