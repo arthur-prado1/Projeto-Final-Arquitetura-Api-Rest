@@ -39,7 +39,7 @@ public class OpenApiConfig {
                                 - Tipos de esporte são cadastrados pela API; esporte inativo não pode ser usado em novas quadras.
 
                                 **Formato:** JSON. Datas `yyyy-MM-dd`, horas `HH:mm`. Todos os erros seguem o modelo `ErroResposta`.""")
-                        .contact(new Contact().name("Equipe eQuadras").url("https://github.com/arthur-prado1"))
+                        .contact(new Contact().name("Equipe eQuadras"))
                         .license(new License().name("MIT")))
                 .tags(List.of(
                         new Tag().name("Clientes").description("Cadastro das pessoas que alugam as quadras"),
