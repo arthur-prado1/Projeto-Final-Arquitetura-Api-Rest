@@ -36,6 +36,7 @@ public class OpenApiConfig {
                                 - Valor total calculado automaticamente (valor da hora x horas).
                                 - Cancelamento e remarcação só com 2 horas de antecedência.
                                 - Cliente e quadra com histórico de reservas não podem ser excluídos.
+                                - Tipos de esporte são cadastrados pela API; esporte inativo não pode ser usado em novas quadras.
 
                                 **Formato:** JSON. Datas `yyyy-MM-dd`, horas `HH:mm`. Todos os erros seguem o modelo `ErroResposta`.""")
                         .contact(new Contact().name("Equipe eQuadras").url("https://github.com/arthur-prado1"))
@@ -43,6 +44,7 @@ public class OpenApiConfig {
                 .tags(List.of(
                         new Tag().name("Clientes").description("Cadastro das pessoas que alugam as quadras"),
                         new Tag().name("Quadras").description("Cadastro das quadras, esporte, preço e horário de funcionamento"),
+                        new Tag().name("Tipos de Esporte").description("Modalidades aceitas pela plataforma: cadastro, consulta, ativação e inativação"),
                         new Tag().name("Reservas").description("Agendamento, remarcação, cancelamento, grade de horários e faturamento")));
     }
 }

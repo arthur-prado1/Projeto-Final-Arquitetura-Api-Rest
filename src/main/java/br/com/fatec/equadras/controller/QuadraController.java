@@ -2,9 +2,7 @@ package br.com.fatec.equadras.controller;
 
 import br.com.fatec.equadras.config.ExemplosApi;
 import br.com.fatec.equadras.exception.ErroResposta;
-import br.com.fatec.equadras.model.EsporteDisponivel;
 import br.com.fatec.equadras.model.Quadra;
-import br.com.fatec.equadras.model.TipoEsporte;
 import br.com.fatec.equadras.service.QuadraService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -31,12 +29,15 @@ public class QuadraController {
     private QuadraService quadraService;
 
     @Operation(summary = "Cadastrar quadra",
-            description = "Nome único. Abertura e fechamento em horas cheias, com fechamento depois da abertura. Se `ativa` não for enviado, a quadra nasce ativa. Valores de `tipoEsporte`: `GET /quadra/esportes`.")
+            description = "Nome único. Abertura e fechamento em horas cheias, com fechamento depois da abertura. Se `ativa` não for enviado, a quadra nasce ativa. "
+                    + "Informe o esporte pelo código (`\"tipoEsporte\": {\"codigo\": \"PADEL\"}`) ou pelo ID (`{\"id_tipo_esporte\": 7}`); a lista está em `GET /tipo-esporte`. O esporte precisa estar ativo.")
     @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(examples = @ExampleObject(value = ExemplosApi.QUADRA_REQUISICAO)))
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Quadra cadastrada",
                     content = @Content(schema = @Schema(implementation = Quadra.class), examples = @ExampleObject(value = ExemplosApi.QUADRA_RESPOSTA))),
-            @ApiResponse(responseCode = "400", description = "Campos inválidos ou horário de funcionamento inválido",
+            @ApiResponse(responseCode = "400", description = "Campos inválidos, horário de funcionamento inválido ou esporte inativo",
+                    content = @Content(schema = @Schema(implementation = ErroResposta.class))),
+            @ApiResponse(responseCode = "404", description = "Tipo de esporte inexistente",
                     content = @Content(schema = @Schema(implementation = ErroResposta.class))),
             @ApiResponse(responseCode = "409", description = "Já existe quadra com este nome",
                     content = @Content(schema = @Schema(implementation = ErroResposta.class)))
@@ -61,16 +62,6 @@ public class QuadraController {
     @GetMapping("/ativas")
     public List<Quadra> listarQuadrasAtivas(){
         return quadraService.listarQuadrasAtivas();
-    }
-
-    @Operation(summary = "Listar tipos de esporte disponíveis",
-            description = "Valores aceitos no campo `tipoEsporte` (cadastro/atualização de quadra e pesquisa por esporte), com um nome para exibir em telas.")
-    @ApiResponse(responseCode = "200", description = "Lista de esportes",
-            content = @Content(array = @ArraySchema(schema = @Schema(implementation = EsporteDisponivel.class)),
-                    examples = @ExampleObject(value = ExemplosApi.ESPORTES_RESPOSTA)))
-    @GetMapping("/esportes")
-    public List<EsporteDisponivel> listarEsportes(){
-        return quadraService.listarEsportes();
     }
 
     // PathVariable: converta o valor inserido na URL e armazene na variável ID
@@ -105,15 +96,15 @@ public class QuadraController {
     }
 
     @Operation(summary = "Pesquisar quadras por esporte",
-            description = "Valores aceitos: consulte `GET /quadra/esportes` (FUTEBOL_SOCIETY, FUTSAL, VOLEI, BEACH_TENNIS, TENIS, BASQUETE, PADEL).")
+            description = "Informe o `codigo` do tipo de esporte (lista em `GET /tipo-esporte`). Não diferencia maiúsculas de minúsculas.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Quadras do esporte (pode ser vazia)",
                     content = @Content(array = @ArraySchema(schema = @Schema(implementation = Quadra.class)))),
-            @ApiResponse(responseCode = "400", description = "Esporte inexistente", content = @Content(schema = @Schema(implementation = ErroResposta.class)))
+            @ApiResponse(responseCode = "404", description = "Tipo de esporte inexistente", content = @Content(schema = @Schema(implementation = ErroResposta.class)))
     })
-    @GetMapping("/esporte/{tipoEsporte}")
-    public List<Quadra> pesquisarQuadraPorEsporte(@Parameter(description = "Tipo de esporte", example = "BEACH_TENNIS") @PathVariable TipoEsporte tipoEsporte){
-        return quadraService.pesquisarQuadraPorEsporte(tipoEsporte);
+    @GetMapping("/esporte/{codigo}")
+    public List<Quadra> pesquisarQuadraPorEsporte(@Parameter(description = "Código do tipo de esporte", example = "BEACH_TENNIS") @PathVariable String codigo){
+        return quadraService.pesquisarQuadraPorEsporte(codigo);
     }
 
     @Operation(summary = "Atualizar quadra pelo ID",
@@ -121,8 +112,8 @@ public class QuadraController {
     @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(examples = @ExampleObject(value = ExemplosApi.QUADRA_REQUISICAO)))
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Quadra atualizada", content = @Content(schema = @Schema(implementation = Quadra.class))),
-            @ApiResponse(responseCode = "400", description = "Campos inválidos", content = @Content(schema = @Schema(implementation = ErroResposta.class))),
-            @ApiResponse(responseCode = "404", description = "Quadra não encontrada", content = @Content(schema = @Schema(implementation = ErroResposta.class))),
+            @ApiResponse(responseCode = "400", description = "Campos inválidos ou troca para um esporte inativo", content = @Content(schema = @Schema(implementation = ErroResposta.class))),
+            @ApiResponse(responseCode = "404", description = "Quadra ou tipo de esporte não encontrado", content = @Content(schema = @Schema(implementation = ErroResposta.class))),
             @ApiResponse(responseCode = "409", description = "Nome já usado por outra quadra", content = @Content(schema = @Schema(implementation = ErroResposta.class)))
     })
     @PutMapping("/{id}")

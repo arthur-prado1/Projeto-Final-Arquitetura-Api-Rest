@@ -34,9 +34,9 @@ Um **serviço central** que guarda clientes, quadras e reservas num banco de dad
 
 ## 3. Funcionalidades
 
-- CRUD completo de **Clientes**, **Quadras** e **Reservas**.
+- CRUD completo de **Clientes**, **Quadras** e **Reservas**, e gestão dos **Tipos de Esporte** (cadastrar, listar, ativar e inativar).
 - Pesquisas por ID, CPF, nome, parte do nome, esporte, quadras ativas, data, status, cliente e quadra.
-- **Lista dos tipos de esporte aceitos**, para qualquer aplicação montar seus filtros e formulários.
+- **Tipos de esporte cadastráveis pela API** (ex.: incluir futevôlei sem mexer no código), com lista para qualquer aplicação montar seus filtros e formulários.
 - **Grade de horários livres** de uma quadra num dia.
 - **Cancelamento** e **remarcação** de reservas com política de antecedência.
 - **Faturamento** por quadra, calculado a partir das reservas confirmadas.
@@ -62,6 +62,9 @@ Um **serviço central** que guarda clientes, quadras e reservas num banco de dad
 | RN11 | Cliente ou quadra **com reservas não podem ser excluídos** (a quadra deve ser inativada) | 409 |
 | RN12 | **CPF, e-mail e nome da quadra únicos**; CPF gravado só com números (com ou sem máscara é o mesmo CPF) | 409 |
 | RN13 | Quadra abre e fecha em horas cheias, com fechamento depois da abertura | 400 |
+| RN14 | **Código do tipo de esporte único**, gravado em MAIÚSCULAS, sem acento e com `_` no lugar de espaço ("futevôlei" vira `FUTEVOLEI`) | 409 / 400 |
+| RN15 | **Esporte inativo não pode ser usado em novas quadras** (as quadras que já existem continuam funcionando) | 400 |
+| RN16 | Ativar um esporte já ativo, ou inativar um já inativo, é recusado | 400 |
 
 **Concorrência:** a criação de reserva trava a linha da quadra no banco (*lock* pessimista, `SELECT ... FOR UPDATE`). Assim, se dois clientes pedirem o mesmo horário no mesmo instante, um espera o outro terminar e recebe 409, em vez de os dois conseguirem reservar.
 
@@ -76,7 +79,7 @@ Um **serviço central** que guarda clientes, quadras e reservas num banco de dad
 | Bean Validation / Hibernate Validator | Validação dos dados (inclui `@CPF`) |
 | springdoc-openapi (Swagger UI) | Documentação |
 | Lombok | Getters/setters automáticos |
-| JUnit 5 + MockMvc + H2 | 30 testes automatizados das regras e endpoints |
+| JUnit 5 + MockMvc + H2 | 33 testes automatizados das regras e endpoints |
 | Maven (Maven Wrapper) | Build |
 
 ## 6. Arquitetura e organização
@@ -86,11 +89,11 @@ Camadas **Controller → Service → Repository → Model**, no mesmo padrão do
 ```
 src/main/java/br/com/fatec/equadras/
 ├── EquadrasApplication.java
-├── controller/   ClienteController, QuadraController, ReservaController   → endpoints HTTP
-├── service/      ClienteService, QuadraService, ReservaService            → regras de negócio
-├── repository/   ClienteRepository, QuadraRepository, ReservaRepository   → acesso ao banco (JpaRepository + Query Methods)
-├── model/        Cliente, Quadra, Reserva (entidades) + TipoEsporte, StatusReserva (enums)
-│                 HorarioDisponivel, ResumoFaturamento, EsporteDisponivel (respostas de consulta)
+├── controller/   ClienteController, QuadraController, ReservaController, TipoEsporteController   → endpoints HTTP
+├── service/      ClienteService, QuadraService, ReservaService, TipoEsporteService               → regras de negócio
+├── repository/   ClienteRepository, QuadraRepository, ReservaRepository, TipoEsporteRepository   → acesso ao banco (JpaRepository + Query Methods)
+├── model/        Cliente, Quadra, Reserva, TipoEsporte (entidades) + StatusReserva (enum)
+│                 HorarioDisponivel, ResumoFaturamento (respostas de consulta)
 ├── exception/    GlobalExceptionHandler, ErroResposta, RegraNegocioException, RecursoNaoEncontradoException
 └── config/       OpenApiConfig (Swagger), ExemplosApi, RelogioConfig, CargaInicialDados
 ```
@@ -101,7 +104,14 @@ src/main/java/br/com/fatec/equadras/
 erDiagram
     CLIENTE ||--o{ RESERVA : "faz"
     QUADRA  ||--o{ RESERVA : "recebe"
+    TIPO_ESPORTE ||--o{ QUADRA : "classifica"
 
+    TIPO_ESPORTE {
+        bigint id_tipo_esporte PK
+        varchar codigo_tipo_esporte UK
+        varchar nome_tipo_esporte
+        boolean ativo_tipo_esporte
+    }
     CLIENTE {
         bigint id_cliente PK
         varchar nome_cliente
@@ -112,7 +122,7 @@ erDiagram
     QUADRA {
         bigint id_quadra PK
         varchar nome_quadra UK
-        varchar tipo_esporte_quadra
+        bigint id_tipo_esporte FK
         numeric valor_hora_quadra
         varchar endereco_quadra
         time hora_abertura_quadra
@@ -157,7 +167,7 @@ erDiagram
    - **Swagger UI:** http://localhost:8080/swagger-ui.html
    - **OpenAPI (JSON):** http://localhost:8080/v3/api-docs
 
-As tabelas são criadas automaticamente pelo Hibernate (`ddl-auto=update`). Na primeira execução, com o banco vazio, a API cadastra **3 quadras, 2 clientes e 1 reserva** (amanhã das 19h às 21h na Arena Society 1) para a demonstração. Para desligar, use `equadras.carga-inicial=false`.
+As tabelas são criadas automaticamente pelo Hibernate (`ddl-auto=update`). Na primeira execução, com o banco vazio, a API cadastra **7 tipos de esporte, 3 quadras, 2 clientes e 1 reserva** (amanhã das 19h às 21h na Arena Society 1) para a demonstração. Para desligar, use `equadras.carga-inicial=false`.
 
 ### Testes automatizados
 ```bash
@@ -166,7 +176,7 @@ mvnw.cmd test        # Windows
 ```
 Os testes usam o banco em memória H2, com o "relógio" fixo em 10/01/2030 às 10:00. Não é preciso ter o PostgreSQL ligado para rodá-los.
 
-## 8. Endpoints (29)
+## 8. Endpoints (32)
 
 ### Clientes — `/cliente`
 | Método | Rota | Descrição | Sucesso |
@@ -179,17 +189,24 @@ Os testes usam o banco em memória H2, com o "relógio" fixo em 10/01/2030 às 1
 | PUT | `/cliente/{id}` | Atualizar | 200 |
 | DELETE | `/cliente/{id}` | Excluir (se não tiver reservas) | 204 |
 
+### Tipos de Esporte — `/tipo-esporte`
+| Método | Rota | Descrição | Sucesso |
+|---|---|---|---|
+| POST | `/tipo-esporte` | Cadastrar tipo de esporte | 201 |
+| GET | `/tipo-esporte` | Listar todos (código, nome e se está ativo) | 200 |
+| PUT | `/tipo-esporte/ativar/{id}` | Ativar | 200 |
+| PUT | `/tipo-esporte/inativar/{id}` | Inativar (não pode ser usado em novas quadras) | 200 |
+
 ### Quadras — `/quadra`
 | Método | Rota | Descrição | Sucesso |
 |---|---|---|---|
 | POST | `/quadra` | Cadastrar quadra | 201 |
 | GET | `/quadra` | Listar todas | 200 |
 | GET | `/quadra/ativas` | Listar só as ativas | 200 |
-| GET | `/quadra/esportes` | Listar os tipos de esporte aceitos (código e nome) | 200 |
 | GET | `/quadra/id/{id}` | Pesquisar pelo ID | 200 |
 | GET | `/quadra/nome/{nome}` | Pesquisar pelo nome exato | 200 |
 | GET | `/quadra/partenome/{nome}` | Pesquisar por parte do nome | 200 |
-| GET | `/quadra/esporte/{tipoEsporte}` | Pesquisar por esporte | 200 |
+| GET | `/quadra/esporte/{codigo}` | Pesquisar pelo código do esporte | 200 |
 | PUT | `/quadra/{id}` | Atualizar (inclusive ativar/inativar) | 200 |
 | DELETE | `/quadra/{id}` | Excluir (se não tiver reservas) | 204 |
 
@@ -209,29 +226,27 @@ Os testes usam o banco em memória H2, com o "relógio" fixo em 10/01/2030 às 1
 | PUT | `/reserva/cancelar/{id}` | Cancelar | 200 |
 | DELETE | `/reserva/{id}` | Excluir (só se cancelada) | 204 |
 
-Valores aceitos em `tipoEsporte`: `FUTEBOL_SOCIETY`, `FUTSAL`, `VOLEI`, `BEACH_TENNIS`, `TENIS`, `BASQUETE`, `PADEL`. Qualquer aplicação pode consultá-los em `GET /quadra/esportes`:
-
-```json
-[
-  { "codigo": "FUTEBOL_SOCIETY", "nome": "Futebol Society" },
-  { "codigo": "FUTSAL", "nome": "Futsal" },
-  { "codigo": "VOLEI", "nome": "Vôlei" },
-  { "codigo": "BEACH_TENNIS", "nome": "Beach Tennis" },
-  { "codigo": "TENIS", "nome": "Tênis" },
-  { "codigo": "BASQUETE", "nome": "Basquete" },
-  { "codigo": "PADEL", "nome": "Padel" }
-]
-```
-
-Um esporte inexistente no cadastro ou na pesquisa devolve `400` com a lista dos valores aceitos.
+A carga inicial cadastra 7 tipos de esporte: `FUTEBOL_SOCIETY`, `FUTSAL`, `VOLEI`, `BEACH_TENNIS`, `TENIS`, `BASQUETE` e `PADEL`. Novos esportes podem ser cadastrados pela API. Na quadra, o esporte é informado pelo código (`"tipoEsporte": {"codigo": "PADEL"}`) ou pelo ID (`{"id_tipo_esporte": 7}`). Um código inexistente devolve `404` indicando `GET /tipo-esporte`.
 
 ## 9. Exemplos
+
+### Cadastrar tipo de esporte — `POST /tipo-esporte`
+```json
+{
+  "codigo": "futevôlei",
+  "nome": "Futevôlei"
+}
+```
+Resposta `201 Created` (o código é normalizado e o esporte nasce ativo):
+```json
+{ "id_tipo_esporte": 8, "codigo": "FUTEVOLEI", "nome": "Futevôlei", "ativo": true }
+```
 
 ### Cadastrar quadra — `POST /quadra`
 ```json
 {
   "nome": "Arena Society 1",
-  "tipoEsporte": "FUTEBOL_SOCIETY",
+  "tipoEsporte": { "codigo": "FUTEBOL_SOCIETY" },
   "valorHora": 150.00,
   "endereco": "Rua das Palmeiras, 100 - Centro",
   "horaAbertura": "08:00",
@@ -265,7 +280,7 @@ Resposta `201 Created` (o valor, o status e a data de criação são preenchidos
 {
   "id_reserva": 1,
   "cliente": { "id_cliente": 1, "nome": "Arthur Prado", "cpf": "52998224725", "email": "arthur@email.com", "telefone": "11987654321" },
-  "quadra": { "id_quadra": 1, "nome": "Arena Society 1", "tipoEsporte": "FUTEBOL_SOCIETY", "valorHora": 150.00, "endereco": "Rua das Palmeiras, 100 - Centro", "horaAbertura": "08:00", "horaFechamento": "23:00", "ativa": true },
+  "quadra": { "id_quadra": 1, "nome": "Arena Society 1", "tipoEsporte": { "id_tipo_esporte": 1, "codigo": "FUTEBOL_SOCIETY", "nome": "Futebol Society", "ativo": true }, "valorHora": 150.00, "endereco": "Rua das Palmeiras, 100 - Centro", "horaAbertura": "08:00", "horaFechamento": "23:00", "ativa": true },
   "data": "2026-11-30",
   "horaInicio": "19:00",
   "horaFim": "21:00",

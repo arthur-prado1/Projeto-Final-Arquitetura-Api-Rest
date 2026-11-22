@@ -29,11 +29,11 @@ public class Quadra {
     @Schema(example = "Arena Society 1")
     private String nome;
 
-    // EnumType.STRING: grava o nome do esporte no banco (ex.: "FUTSAL") em vez de um número
-    @Enumerated(EnumType.STRING)
-    @Column (name = "tipo_esporte_quadra", nullable=false)
+    // ManyToOne: muitas quadras podem ser do mesmo tipo de esporte (chave estrangeira id_tipo_esporte)
+    @ManyToOne
+    @JoinColumn (name = "id_tipo_esporte", nullable=false)
     @NotNull(message = "O tipo de esporte é obrigatório.")
-    @Schema(example = "FUTEBOL_SOCIETY")
+    @Schema(description = "Basta enviar o código ou o ID: {\"codigo\": \"PADEL\"} ou {\"id_tipo_esporte\": 7}")
     private TipoEsporte tipoEsporte;
 
     // BigDecimal: tipo indicado para valores em dinheiro (não perde centavos em arredondamentos)

@@ -6,6 +6,7 @@ import br.com.fatec.equadras.model.TipoEsporte;
 import br.com.fatec.equadras.repository.ClienteRepository;
 import br.com.fatec.equadras.repository.QuadraRepository;
 import br.com.fatec.equadras.repository.ReservaRepository;
+import br.com.fatec.equadras.repository.TipoEsporteRepository;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -48,19 +49,31 @@ class EquadrasApiTest {
     @Autowired
     private QuadraRepository quadraRepository;
 
+    @Autowired
+    private TipoEsporteRepository tipoEsporteRepository;
+
     private Long idCliente;
     private Long idOutroCliente;
     private Long idQuadra;
     private Long idOutraQuadra;
+    private TipoEsporte society;
+    private TipoEsporte beach;
+    private TipoEsporte futsal;
 
     @BeforeEach
     void prepararBanco() {
         reservaRepository.deleteAll();
         clienteRepository.deleteAll();
         quadraRepository.deleteAll();
+        tipoEsporteRepository.deleteAll();
 
-        idQuadra = quadraRepository.save(quadra("Arena Society 1", TipoEsporte.FUTEBOL_SOCIETY, "150.00", true)).getId_quadra();
-        idOutraQuadra = quadraRepository.save(quadra("Quadra Beach 1", TipoEsporte.BEACH_TENNIS, "90.00", true)).getId_quadra();
+        society = tipoEsporteRepository.save(esporte("FUTEBOL_SOCIETY", "Futebol Society"));
+        beach = tipoEsporteRepository.save(esporte("BEACH_TENNIS", "Beach Tennis"));
+        futsal = tipoEsporteRepository.save(esporte("FUTSAL", "Futsal"));
+        tipoEsporteRepository.save(esporte("PADEL", "Padel"));
+
+        idQuadra = quadraRepository.save(quadra("Arena Society 1", society, "150.00", true)).getId_quadra();
+        idOutraQuadra = quadraRepository.save(quadra("Quadra Beach 1", beach, "90.00", true)).getId_quadra();
         idCliente = clienteRepository.save(cliente("Arthur Prado", "52998224725", "arthur@email.com")).getId_cliente();
         idOutroCliente = clienteRepository.save(cliente("Marina Souza", "11144477735", "marina@email.com")).getId_cliente();
     }
@@ -141,7 +154,7 @@ class EquadrasApiTest {
     @Test
     @DisplayName("Recusa reserva em quadra inativa")
     void recusaQuadraInativa() throws Exception {
-        Long idInativa = quadraRepository.save(quadra("Quadra em Reforma", TipoEsporte.FUTSAL, "100.00", false)).getId_quadra();
+        Long idInativa = quadraRepository.save(quadra("Quadra em Reforma", futsal, "100.00", false)).getId_quadra();
 
         reservar(idCliente, idInativa, DIA_FUTURO, "19:00", "20:00")
                 .andExpect(status().isBadRequest())
@@ -291,11 +304,13 @@ class EquadrasApiTest {
     @DisplayName("Cadastra quadra ativa por padrão e recusa horário de funcionamento inválido")
     void cadastroDeQuadra() throws Exception {
         String valida = """
-                {"nome":"Quadra Padel 1","tipoEsporte":"PADEL","valorHora":110.00,"endereco":"Rua A, 1",
+                {"nome":"Quadra Padel 1","tipoEsporte":{"codigo":"padel"},"valorHora":110.00,"endereco":"Rua A, 1",
                  "horaAbertura":"07:00","horaFechamento":"22:00"}""";
         mockMvc.perform(post("/quadra").contentType(MediaType.APPLICATION_JSON).content(valida))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.ativa").value(true))
+                .andExpect(jsonPath("$.tipoEsporte.codigo").value("PADEL"))
+                .andExpect(jsonPath("$.tipoEsporte.nome").value("Padel"))
                 .andExpect(jsonPath("$.horaAbertura").value("07:00"));
 
         String invertida = valida.replace("Quadra Padel 1", "Quadra Padel 2").replace("\"07:00\"", "\"23:00\"");
@@ -313,37 +328,101 @@ class EquadrasApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].nome").value("Quadra Beach 1"));
-        mockMvc.perform(get("/quadra/esporte/XADREZ")).andExpect(status().isBadRequest());
+        mockMvc.perform(get("/quadra/esporte/beach_tennis")).andExpect(jsonPath("$.length()").value(1));
+        mockMvc.perform(get("/quadra/esporte/XADREZ")).andExpect(status().isNotFound());
         mockMvc.perform(get("/quadra/partenome/arena")).andExpect(jsonPath("$.length()").value(1));
         mockMvc.perform(get("/quadra/nome/arena society 1")).andExpect(status().isOk());
         mockMvc.perform(get("/quadra/id/999")).andExpect(status().isNotFound());
     }
 
+    // ===================== TIPOS DE ESPORTE =====================
+
     @Test
-    @DisplayName("Lista os tipos de esporte disponíveis com código e nome")
-    void listaEsportes() throws Exception {
-        mockMvc.perform(get("/quadra/esportes"))
+    @DisplayName("Lista os tipos de esporte em ordem de nome")
+    void listaTiposEsporte() throws Exception {
+        mockMvc.perform(get("/tipo-esporte"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(TipoEsporte.values().length))
-                .andExpect(jsonPath("$[0].codigo").value("FUTEBOL_SOCIETY"))
-                .andExpect(jsonPath("$[0].nome").value("Futebol Society"))
-                .andExpect(jsonPath("$[3].codigo").value("BEACH_TENNIS"));
+                .andExpect(jsonPath("$.length()").value(4))
+                .andExpect(jsonPath("$[0].codigo").value("BEACH_TENNIS"))
+                .andExpect(jsonPath("$[0].nome").value("Beach Tennis"))
+                .andExpect(jsonPath("$[0].ativo").value(true));
     }
 
     @Test
-    @DisplayName("Esporte inválido no JSON ou na URL devolve 400 listando os valores aceitos")
-    void esporteInvalidoListaValoresAceitos() throws Exception {
+    @DisplayName("Cadastra tipo de esporte normalizando o código e recusa código repetido ou inválido")
+    void cadastraTipoEsporte() throws Exception {
+        String futevolei = """
+                {"codigo":"futevôlei","nome":"Futevôlei"}""";
+        mockMvc.perform(post("/tipo-esporte").contentType(MediaType.APPLICATION_JSON).content(futevolei))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.codigo").value("FUTEVOLEI"))
+                .andExpect(jsonPath("$.ativo").value(true));
+
+        mockMvc.perform(post("/tipo-esporte").contentType(MediaType.APPLICATION_JSON).content(futevolei))
+                .andExpect(status().isConflict());
+
+        mockMvc.perform(post("/tipo-esporte").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"codigo":"@#","nome":"Inválido"}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem", containsString("Código inválido")));
+
+        mockMvc.perform(post("/tipo-esporte").contentType(MediaType.APPLICATION_JSON).content("""
+                        {"codigo":"","nome":""}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.campos.length()").value(3));
+    }
+
+    @Test
+    @DisplayName("Esporte inativo não pode ser usado em nova quadra; reativado, volta a poder")
+    void ativarEInativarTipoEsporte() throws Exception {
+        String quadraFutsal = """
+                {"nome":"Ginásio Novo","tipoEsporte":{"id_tipo_esporte":%d},"valorHora":100.00,"endereco":"Rua B, 2",
+                 "horaAbertura":"08:00","horaFechamento":"22:00"}""".formatted(futsal.getId_tipo_esporte());
+
+        mockMvc.perform(put("/tipo-esporte/inativar/" + futsal.getId_tipo_esporte()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ativo").value(false));
+        mockMvc.perform(put("/tipo-esporte/inativar/" + futsal.getId_tipo_esporte()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem", containsString("já está inativo")));
+
+        mockMvc.perform(post("/quadra").contentType(MediaType.APPLICATION_JSON).content(quadraFutsal))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensagem", containsString("está inativo")));
+
+        mockMvc.perform(put("/tipo-esporte/ativar/" + futsal.getId_tipo_esporte()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ativo").value(true));
+        mockMvc.perform(post("/quadra").contentType(MediaType.APPLICATION_JSON).content(quadraFutsal))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(put("/tipo-esporte/ativar/999")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("Quadra que já existe continua funcionando quando o esporte dela é inativado")
+    void quadraExistenteComEsporteInativado() throws Exception {
+        mockMvc.perform(put("/tipo-esporte/inativar/" + society.getId_tipo_esporte())).andExpect(status().isOk());
+
+        reservar(idCliente, idQuadra, DIA_FUTURO, "19:00", "20:00").andExpect(status().isCreated());
+
+        String edicaoMesmoEsporte = """
+                {"nome":"Arena Society 1 Reformada","tipoEsporte":{"codigo":"FUTEBOL_SOCIETY"},"valorHora":160.00,
+                 "endereco":"Rua Teste, 10","horaAbertura":"08:00","horaFechamento":"23:00"}""";
+        mockMvc.perform(put("/quadra/" + idQuadra).contentType(MediaType.APPLICATION_JSON).content(edicaoMesmoEsporte))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nome").value("Arena Society 1 Reformada"));
+    }
+
+    @Test
+    @DisplayName("Quadra com tipo de esporte inexistente devolve 404 indicando onde consultar")
+    void quadraComEsporteInexistente() throws Exception {
         String quadraXadrez = """
-                {"nome":"Quadra Xadrez","tipoEsporte":"XADREZ","valorHora":50.00,"endereco":"Rua A, 1",
+                {"nome":"Quadra Xadrez","tipoEsporte":{"codigo":"XADREZ"},"valorHora":50.00,"endereco":"Rua A, 1",
                  "horaAbertura":"08:00","horaFechamento":"22:00"}""";
         mockMvc.perform(post("/quadra").contentType(MediaType.APPLICATION_JSON).content(quadraXadrez))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.mensagem", containsString("Valores aceitos: FUTEBOL_SOCIETY, FUTSAL")))
-                .andExpect(jsonPath("$.mensagem", containsString("GET /quadra/esportes")));
-
-        mockMvc.perform(get("/quadra/esporte/XADREZ"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.mensagem", containsString("Valores aceitos: FUTEBOL_SOCIETY")));
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.mensagem", containsString("GET /tipo-esporte")));
     }
 
     @Test
@@ -432,6 +511,14 @@ class EquadrasApiTest {
         q.setHoraFechamento(LocalTime.of(23, 0));
         q.setAtiva(ativa);
         return q;
+    }
+
+    private TipoEsporte esporte(String codigo, String nome) {
+        TipoEsporte t = new TipoEsporte();
+        t.setCodigo(codigo);
+        t.setNome(nome);
+        t.setAtivo(true);
+        return t;
     }
 
     private Cliente cliente(String nome, String cpf, String email) {

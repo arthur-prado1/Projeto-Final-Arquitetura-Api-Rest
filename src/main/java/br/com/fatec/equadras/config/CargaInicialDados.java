@@ -4,6 +4,7 @@ import br.com.fatec.equadras.model.*;
 import br.com.fatec.equadras.repository.ClienteRepository;
 import br.com.fatec.equadras.repository.QuadraRepository;
 import br.com.fatec.equadras.repository.ReservaRepository;
+import br.com.fatec.equadras.repository.TipoEsporteRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 
 // Cadastra dados de exemplo quando o banco está vazio, para a API já ter o que mostrar na primeira execução.
 // Desligue com equadras.carga-inicial=false no application.properties.
@@ -37,15 +39,31 @@ public class CargaInicialDados implements CommandLineRunner {
     @Autowired
     private Clock relogio;
 
+    @Autowired
+    private TipoEsporteRepository tipoEsporteRepository;
+
     @Override
     public void run(String... args) {
+        // Tipos de esporte iniciais (só se a tabela estiver vazia)
+        if (tipoEsporteRepository.count() == 0) {
+            tipoEsporteRepository.saveAll(List.of(
+                    esporte("FUTEBOL_SOCIETY", "Futebol Society"),
+                    esporte("FUTSAL", "Futsal"),
+                    esporte("VOLEI", "Vôlei"),
+                    esporte("BEACH_TENNIS", "Beach Tennis"),
+                    esporte("TENIS", "Tênis"),
+                    esporte("BASQUETE", "Basquete"),
+                    esporte("PADEL", "Padel")));
+            log.info("Carga inicial: 7 tipos de esporte cadastrados.");
+        }
+
         if (quadraRepository.count() > 0 || clienteRepository.count() > 0) {
             return; // banco já tem dados: não mexe em nada
         }
 
-        Quadra society = quadraRepository.save(quadra("Arena Society 1", TipoEsporte.FUTEBOL_SOCIETY, "150.00", "Rua das Palmeiras, 100 - Centro", 8, 23));
-        quadraRepository.save(quadra("Quadra Beach Tennis Sol", TipoEsporte.BEACH_TENNIS, "90.00", "Av. Beira Rio, 2500 - Jardim América", 7, 22));
-        quadraRepository.save(quadra("Ginásio Futsal Central", TipoEsporte.FUTSAL, "120.00", "Rua XV de Novembro, 45 - Centro", 9, 23));
+        Quadra society = quadraRepository.save(quadra("Arena Society 1", "FUTEBOL_SOCIETY", "150.00", "Rua das Palmeiras, 100 - Centro", 8, 23));
+        quadraRepository.save(quadra("Quadra Beach Tennis Sol", "BEACH_TENNIS", "90.00", "Av. Beira Rio, 2500 - Jardim América", 7, 22));
+        quadraRepository.save(quadra("Ginásio Futsal Central", "FUTSAL", "120.00", "Rua XV de Novembro, 45 - Centro", 9, 23));
 
         Cliente arthur = clienteRepository.save(cliente("Arthur Prado", "52998224725", "arthur@email.com", "11987654321"));
         clienteRepository.save(cliente("Marina Souza", "11144477735", "marina@email.com", "11912345678"));
@@ -65,10 +83,18 @@ public class CargaInicialDados implements CommandLineRunner {
         log.info("Carga inicial: 3 quadras, 2 clientes e 1 reserva de exemplo cadastrados.");
     }
 
-    private Quadra quadra(String nome, TipoEsporte esporte, String valorHora, String endereco, int abre, int fecha) {
+    private TipoEsporte esporte(String codigo, String nome) {
+        TipoEsporte t = new TipoEsporte();
+        t.setCodigo(codigo);
+        t.setNome(nome);
+        t.setAtivo(true);
+        return t;
+    }
+
+    private Quadra quadra(String nome, String codigoEsporte, String valorHora, String endereco, int abre, int fecha) {
         Quadra q = new Quadra();
         q.setNome(nome);
-        q.setTipoEsporte(esporte);
+        q.setTipoEsporte(tipoEsporteRepository.findByCodigo(codigoEsporte).orElseThrow());
         q.setValorHora(new BigDecimal(valorHora));
         q.setEndereco(endereco);
         q.setHoraAbertura(LocalTime.of(abre, 0));

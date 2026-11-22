@@ -24,11 +24,37 @@ public final class ExemplosApi {
               "telefone": "11987654321"
             }""";
 
+    // ---------- TIPO DE ESPORTE ----------
+    public static final String TIPO_ESPORTE_REQUISICAO = """
+            {
+              "codigo": "FUTEVOLEI",
+              "nome": "Futevôlei"
+            }""";
+
+    public static final String TIPO_ESPORTE_RESPOSTA = """
+            {
+              "id_tipo_esporte": 8,
+              "codigo": "FUTEVOLEI",
+              "nome": "Futevôlei",
+              "ativo": true
+            }""";
+
+    public static final String TIPOS_ESPORTE_LISTA = """
+            [
+              { "id_tipo_esporte": 6, "codigo": "BASQUETE", "nome": "Basquete", "ativo": true },
+              { "id_tipo_esporte": 4, "codigo": "BEACH_TENNIS", "nome": "Beach Tennis", "ativo": true },
+              { "id_tipo_esporte": 1, "codigo": "FUTEBOL_SOCIETY", "nome": "Futebol Society", "ativo": true },
+              { "id_tipo_esporte": 2, "codigo": "FUTSAL", "nome": "Futsal", "ativo": true },
+              { "id_tipo_esporte": 7, "codigo": "PADEL", "nome": "Padel", "ativo": true },
+              { "id_tipo_esporte": 5, "codigo": "TENIS", "nome": "Tênis", "ativo": true },
+              { "id_tipo_esporte": 3, "codigo": "VOLEI", "nome": "Vôlei", "ativo": false }
+            ]""";
+
     // ---------- QUADRA ----------
     public static final String QUADRA_REQUISICAO = """
             {
               "nome": "Arena Society 1",
-              "tipoEsporte": "FUTEBOL_SOCIETY",
+              "tipoEsporte": { "codigo": "FUTEBOL_SOCIETY" },
               "valorHora": 150.00,
               "endereco": "Rua das Palmeiras, 100 - Centro",
               "horaAbertura": "08:00",
@@ -40,24 +66,13 @@ public final class ExemplosApi {
             {
               "id_quadra": 1,
               "nome": "Arena Society 1",
-              "tipoEsporte": "FUTEBOL_SOCIETY",
+              "tipoEsporte": { "id_tipo_esporte": 1, "codigo": "FUTEBOL_SOCIETY", "nome": "Futebol Society", "ativo": true },
               "valorHora": 150.00,
               "endereco": "Rua das Palmeiras, 100 - Centro",
               "horaAbertura": "08:00",
               "horaFechamento": "23:00",
               "ativa": true
             }""";
-
-    public static final String ESPORTES_RESPOSTA = """
-            [
-              { "codigo": "FUTEBOL_SOCIETY", "nome": "Futebol Society" },
-              { "codigo": "FUTSAL", "nome": "Futsal" },
-              { "codigo": "VOLEI", "nome": "Vôlei" },
-              { "codigo": "BEACH_TENNIS", "nome": "Beach Tennis" },
-              { "codigo": "TENIS", "nome": "Tênis" },
-              { "codigo": "BASQUETE", "nome": "Basquete" },
-              { "codigo": "PADEL", "nome": "Padel" }
-            ]""";
 
     // ---------- RESERVA ----------
     public static final String RESERVA_REQUISICAO = """
@@ -82,7 +97,7 @@ public final class ExemplosApi {
               "quadra": {
                 "id_quadra": 1,
                 "nome": "Arena Society 1",
-                "tipoEsporte": "FUTEBOL_SOCIETY",
+                "tipoEsporte": { "id_tipo_esporte": 1, "codigo": "FUTEBOL_SOCIETY", "nome": "Futebol Society", "ativo": true },
                 "valorHora": 150.00,
                 "endereco": "Rua das Palmeiras, 100 - Centro",
                 "horaAbertura": "08:00",

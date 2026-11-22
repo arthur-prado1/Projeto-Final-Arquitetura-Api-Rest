@@ -1,6 +1,5 @@
 package br.com.fatec.equadras.exception;
 
-import br.com.fatec.equadras.model.TipoEsporte;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -45,15 +44,8 @@ public class GlobalExceptionHandler {
     // 400 - JSON mal formado, data/hora em formato errado ou valor de enum inexistente
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErroResposta> tratarJsonInvalido(HttpMessageNotReadableException ex, HttpServletRequest request) {
-        // Esporte inexistente no JSON: a resposta já diz quais valores são aceitos
-        String causa = String.valueOf(ex.getMostSpecificCause().getMessage());
-        if (causa.contains(TipoEsporte.class.getSimpleName())) {
-            return montar(HttpStatus.BAD_REQUEST,
-                    "Valor inválido para 'tipoEsporte'. Valores aceitos: " + valoresAceitos(TipoEsporte.class)
-                            + ". Consulte GET /quadra/esportes.", request, null);
-        }
         return montar(HttpStatus.BAD_REQUEST,
-                "JSON inválido. Confira o formato: datas yyyy-MM-dd, horas HH:mm e valores permitidos dos campos (ex.: tipoEsporte).",
+                "JSON inválido. Confira o formato: datas yyyy-MM-dd, horas HH:mm e o tipo de cada campo (ex.: \"tipoEsporte\": {\"codigo\": \"PADEL\"}).",
                 request, null);
     }
 

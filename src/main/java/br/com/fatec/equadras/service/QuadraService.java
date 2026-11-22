@@ -2,7 +2,6 @@ package br.com.fatec.equadras.service;
 
 import br.com.fatec.equadras.exception.RecursoNaoEncontradoException;
 import br.com.fatec.equadras.exception.RegraNegocioException;
-import br.com.fatec.equadras.model.EsporteDisponivel;
 import br.com.fatec.equadras.model.Quadra;
 import br.com.fatec.equadras.model.TipoEsporte;
 import br.com.fatec.equadras.repository.QuadraRepository;
@@ -12,7 +11,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalTime;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,6 +24,9 @@ public class QuadraService {
     @Autowired
     private ReservaRepository reservaRepository;
 
+    @Autowired
+    private TipoEsporteService tipoEsporteService;
+
     public Quadra cadastrarQuadra(Quadra quadra){
         quadra.setId_quadra(null); // o ID é sempre gerado pelo banco
         quadra.setNome(quadra.getNome().trim());
@@ -34,6 +35,7 @@ public class QuadraService {
         }
         validarHorarioFuncionamento(quadra.getHoraAbertura(), quadra.getHoraFechamento());
         validarNomeUnico(quadra.getNome(), null);
+        quadra.setTipoEsporte(buscarEsporteAtivo(quadra.getTipoEsporte()));
         return quadraRepository.save(quadra);
     }
 
@@ -55,19 +57,13 @@ public class QuadraService {
         return quadraRepository.findByNomeContainingIgnoreCaseOrderByNomeAsc(nome);
     }
 
-    public List<Quadra> pesquisarQuadraPorEsporte (TipoEsporte tipoEsporte) {
+    public List<Quadra> pesquisarQuadraPorEsporte (String codigo) {
+        TipoEsporte tipoEsporte = tipoEsporteService.pesquisarTipoEsportePorCodigo(codigo); // 404 se o esporte não existir
         return quadraRepository.findByTipoEsporteOrderByNomeAsc(tipoEsporte);
     }
 
     public List<Quadra> listarQuadrasAtivas () {
         return quadraRepository.findByAtivaTrueOrderByNomeAsc();
-    }
-
-    // Lista os esportes aceitos, lida direto do enum: um esporte novo no enum aparece aqui automaticamente
-    public List<EsporteDisponivel> listarEsportes () {
-        return Arrays.stream(TipoEsporte.values())
-                .map(esporte -> new EsporteDisponivel(esporte.name(), esporte.getNome()))
-                .toList();
     }
 
     public Quadra atualizarQuadra (Long id, Quadra quadraAtualizada) {
@@ -76,8 +72,15 @@ public class QuadraService {
         validarHorarioFuncionamento(quadraAtualizada.getHoraAbertura(), quadraAtualizada.getHoraFechamento());
         validarNomeUnico(quadraAtualizada.getNome().trim(), id);
 
+        // Manter o esporte atual é sempre permitido (mesmo que ele tenha sido inativado depois);
+        // trocar de esporte exige que o novo esteja ativo
+        TipoEsporte esporte = buscarEsporte(quadraAtualizada.getTipoEsporte());
+        if (!esporte.getId_tipo_esporte().equals(quadra.getTipoEsporte().getId_tipo_esporte())) {
+            validarEsporteAtivo(esporte);
+        }
+
         quadra.setNome(quadraAtualizada.getNome().trim());
-        quadra.setTipoEsporte(quadraAtualizada.getTipoEsporte());
+        quadra.setTipoEsporte(esporte);
         quadra.setValorHora(quadraAtualizada.getValorHora());
         quadra.setEndereco(quadraAtualizada.getEndereco());
         quadra.setHoraAbertura(quadraAtualizada.getHoraAbertura());
@@ -115,6 +118,30 @@ public class QuadraService {
         Optional<Quadra> mesmoNome = quadraRepository.findByNomeIgnoreCase(nome);
         if (mesmoNome.isPresent() && !mesmoNome.get().getId_quadra().equals(idAtual)) {
             throw RegraNegocioException.conflito("Já existe uma quadra com o nome '" + nome + "'.");
+        }
+    }
+
+    // O esporte pode vir pelo ID ({"id_tipo_esporte": 7}) ou pelo código ({"codigo": "PADEL"})
+    private TipoEsporte buscarEsporte(TipoEsporte referencia) {
+        if (referencia.getId_tipo_esporte() != null) {
+            return tipoEsporteService.pesquisarTipoEsporte(referencia.getId_tipo_esporte());
+        }
+        if (referencia.getCodigo() != null && !referencia.getCodigo().isBlank()) {
+            return tipoEsporteService.pesquisarTipoEsportePorCodigo(referencia.getCodigo());
+        }
+        throw new RegraNegocioException("Informe o tipo de esporte pelo código ou pelo ID: \"tipoEsporte\": {\"codigo\": \"PADEL\"}");
+    }
+
+    private TipoEsporte buscarEsporteAtivo(TipoEsporte referencia) {
+        TipoEsporte esporte = buscarEsporte(referencia);
+        validarEsporteAtivo(esporte);
+        return esporte;
+    }
+
+    // Regra: esporte inativo não pode ser usado em novas quadras
+    private void validarEsporteAtivo(TipoEsporte esporte) {
+        if (!esporte.getAtivo()) {
+            throw new RegraNegocioException("O esporte " + esporte.getNome() + " está inativo e não pode ser usado em novas quadras.");
         }
     }
 }
