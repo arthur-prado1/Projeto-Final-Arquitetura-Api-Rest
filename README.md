@@ -336,8 +336,3 @@ Resposta `201 Created` (o valor, o status e a data de criação são preenchidos
 | 400 Bad Request | Campos inválidos, JSON mal formado ou regra de negócio violada |
 | 404 Not Found | ID/CPF/nome inexistente ou rota inexistente |
 | 409 Conflict | Horário já reservado, dado duplicado ou exclusão de registro com reservas |
-
-## 11. Autores
-
-- Arthur Prado — [@arthur-prado1](https://github.com/arthur-prado1)
-- _[nome do(a) integrante da dupla]_
